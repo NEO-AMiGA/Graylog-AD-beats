@@ -39,7 +39,7 @@ set "graylogSidecarInstaller=%installerDir%\windows_installers_and_files\graylog
 
 :: An updated version of winlogbeat. Elasticsearch Beats changed the prefix from winlogbeat to winlog and the 'AD-Monitoring-pipeline-rules.json' uses this updated schema. 
 :: So use this exe or edit the json. 
-set "winlogBeatUpdatedEXE=%installerDir%\windows_installers_and_files\winlogbeat-7.16.3-windows-x64\winlogbeat.exe"
+set "winlogBeatUpdatedEXE=%installerDir%\windows_installers_and_files\winlogbeat-7.16.3-windows-x86_64\winlogbeat.exe"
 
 :: timestamp for backup of settings
 for /F "usebackq tokens=1,2 delims==" %%i in (`wmic os get LocalDateTime /VALUE 2^>NUL`) do if '.%%i.'=='.LocalDateTime.' set ldt=%%j
