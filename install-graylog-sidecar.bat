@@ -43,7 +43,7 @@ set "winlogBeatUpdatedEXE=%installerDir%\windows_installers_and_files\winlogbeat
 
 :: timestamp for backup of settings
 for /F "usebackq tokens=1,2 delims==" %%i in (`wmic os get LocalDateTime /VALUE 2^>NUL`) do if '.%%i.'=='.LocalDateTime.' set ldt=%%j
-set timestamp=%ldt:~2,2%%ldt:~4,2%%ldt:~6,2% %ldt:~8,2%%ldt:~10,2%%ldt:~12,2%
+set timestamp=%ldt:~2,2%%ldt:~4,2%%ldt:~6,2%_%ldt:~8,2%%ldt:~10,2%%ldt:~12,2%
 
 
 :: DEBUG OUTPUT OF VARS ------------------------------------------------------------------------------------------------
