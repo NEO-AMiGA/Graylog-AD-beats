@@ -37,6 +37,11 @@ set "graylogAPItoken=1u3ivm9ubg7fpi4tfqo0uass3e0n4nms5lvj96fuphj0qilubvgf"
 :: The Graylog-AD-beats-master dir. Default is the one this bat file is runing from. 
 set "installerDir=%~dp0"
 
+:: An updated version of winlogbeat. Elasticsearch Beats changed the prefix from winlogbeat to winlog and the 'AD-Monitoring-pipeline-rules.json' uses this updated schema. 
+:: So use this exe or edit the json. 
+set "winlogBeatUpdatedEXE=%installerDir%\winlogbeat-7.16.3-windows-x86\winlogbeat.exe"
+
+
 :: timestamp for backup of settings
 for /F "usebackq tokens=1,2 delims==" %%i in (`wmic os get LocalDateTime /VALUE 2^>NUL`) do if '.%%i.'=='.LocalDateTime.' set ldt=%%j
 set timestamp=%ldt:~2,2%%ldt:~4,2%%ldt:~6,2% %ldt:~8,2%%ldt:~10,2%%ldt:~12,2%
@@ -82,49 +87,84 @@ goto :install_choice
 	:: Check if alreaedy installed. If so, uninstall service.
 	if exist "%graylogInstallationDir%\sidecar\graylog-sidecar.exe" (
 		echo.
-		echo - Graylog Sidecar SERVICE UNINSTALL...
+		echo [INFO] Graylog Sidecar SERVICE UNINSTALL...
 		"%graylogInstallationDir%\sidecar\graylog-sidecar.exe" -service uninstall
 	)
 
 	echo.
-	echo - Graylog Sidecar INSTALL
+	echo [INFO] Graylog Sidecar INSTALL
  	%graylogSidecarInstaller% /S -SERVERURL=%graylogServerURL% /S -SERVERURL=%graylogServerURL% -APITOKEN=%graylogAPItoken%
 
  	echo.
-	echo - Graylog YAML - Backing up original config to 'sidecar.yml-orig-%timestamp%'...
+	echo [INFO] Graylog YAML - Backing up original config to 'sidecar.yml-orig-%timestamp%'...
 	move "%graylogInstallationDir%\sidecar\sidecar.yml" "%graylogInstallationDir%\sidecar\sidecar.yml-orig-%timestamp%" >nul 2>&1
 
 	echo.
-	echo - Graylog YAML - Creating Yaml from template and adding server URL and API Token to it...
+	echo [INFO] Graylog YAML - Creating Yaml from template and adding server URL and API Token to it...
 	echo server_url: %graylogServerURL% >>"%graylogInstallationDir%\sidecar\sidecar.yml"
 	echo server_api_token: "%graylogAPItoken%" >>"%graylogInstallationDir%\sidecar\sidecar.yml"
 
 	type %installerDir%\windows-graylog-sidecar.yml >> "%graylogInstallationDir%\sidecar\sidecar.yml"
 
 	echo.
-	echo - Graylog Sidecar App Installed and configured
+	echo [INFO] Graylog Sidecar App Installed and configured
 
-	echo.
 	:: Check if alreaedy installed. If it is we DON'T install it. We only need to start it. Some issues so we run this twice.
+	echo.
 	sc query graylog-sidecar >nul 2>&1
 	sc query graylog-sidecar >nul 2>&1
 	if %ERRORLEVEL% NEQ 0 (
-		echo - Graylog Sidecar SERVICE Installing...
+		echo [INFO] Graylog Sidecar SERVICE Installing...
 		"%graylogInstallationDir%\sidecar\graylog-sidecar.exe" -service install 
 		"%graylogInstallationDir%\sidecar\graylog-sidecar.exe" -service start
 	) else (
 		echo.
-		echo - Graylog Sidecar SERVICE starting...
+		echo [INFO] Graylog Sidecar SERVICE starting...
 		:: the stop is here since the installer starts one of the services. Stoping gives a cleaner result.
 		:: But honesly, the else isn't needed since we uninstall the service above instead of stopping
 		"%graylogInstallationDir%\sidecar\graylog-sidecar.exe" -service stop
 		"%graylogInstallationDir%\sidecar\graylog-sidecar.exe" -service start
 	)
 	echo.
-	echo - Graylog Sidecar SERVICE Done
+	echo [INFO] Graylog Sidecar SERVICE Done
 	echo.
-	echo - Graylog Sidecar Installation Complete
+	echo [INFO] Graylog Sidecar Installation Complete
 	echo.
+
+
+goto :update_winlogbeat_choice
+
+:update_winlogbeat_choice
+	echo.
+	echo IMPORTANT! The 'AD-Monitoring-pipeline-rules.json' expects an updated naming scheme that a newer version of the 'winlogbeat.exe' provides. 
+	echo You can either update the exe here, or edit the .json and rename the fields manually. I do not have a full list of whats needs to be renamed.
+	echo The lazy and sober approach to this is to answer 'Y' here and replace the exe.
+	echo.
+	echo Current and installed version:
+	"%graylogInstallationDir%\sidecar\winlogbeat.exe version"
+	echo.
+	echo The version it would be replaced with:
+	%winlogBeatUpdatedEXE% version
+
+	set /P c=Do you want to replace the winlogbeat.exe [y/N]? 
+	setlocal EnableDelayedExpansion
+	if /I "!c!" == "Y" goto :replace_winlogbeat
+	if /I "!c!" == "N" goto :eof
+	goto :update_winlogbeat
+
+:replace_winlogbeat
+	echo [INFO] Graylog Sidecar SERVICE stopping...
+	:: we need to stop it before replacing. I think. At least not so rude...
+	"%graylogInstallationDir%\sidecar\graylog-sidecar.exe" -service stop
+	echo [INFO] Copying new exe...
+	xcopy /y %winlogBeatUpdatedEXE% %graylogInstallationDir%\sidecar\
+	echo [INFO] Graylog Sidecar SERVICE starting...
+	"%graylogInstallationDir%\sidecar\graylog-sidecar.exe" -service start
+	echo. 
+	echo.
+	echo -eof- all done, installation complete. Hopefully it all works, glhf.
+	echo.
+
 
 @echo ON
 

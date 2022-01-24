@@ -1,0 +1,2252 @@
+{
+  "v": 1,
+  "id": "7ebe8a90-69ca-4e44-ae95-4de29039fc7c",
+  "rev": 6,
+  "name": "Active Directory Monitoring and Alerting - Beats",
+  "summary": "Monitor AD changes and user authentication",
+  "description": "Monitors changes to AD structure, groups and users.  Separates information from warning and critical messages.  Alerts on changes to AD structure and password resets.  Framework for alerting on other logged events such as Exchange certificate expiry.",
+  "vendor": "Thus",
+  "url": "https://github.com/tmacgbay/Graylog-AD-beats",
+  "parameters": [
+    {
+      "name": "AuthEvent_minus_DC",
+      "title": "Authentication events minus DCS",
+      "description": "Authentication events subtracting out DCs",
+      "type": "string",
+      "default_value": "(winlogbeat_event_id:4625 OR winlogbeat_event_id:4771 OR winlogbeat_event_id:4820) AND NOT cmg_requestingName:<DC-NAME> AND NOT cmg_requestingName:<DC-NAME>"
+    },
+    {
+      "name": "DNS_IPs",
+      "title": "DNS IPs",
+      "description": "IP addresses of DNS Servers",
+      "type": "string",
+      "default_value": "#.#.#.#, #.#.#.#"
+    },
+    {
+      "name": "P2_email_sender",
+      "title": "P2 Graylog Sender",
+      "description": "email sender for Priority two alerts",
+      "type": "string",
+      "default_value": "P2_alert@yourcomp.org"
+    },
+    {
+      "name": "P1_email_sender",
+      "title": "P1 Graylog Sender",
+      "description": "email address - sender -  priority one events",
+      "type": "string",
+      "default_value": "P1-ALERT@yourcomp.org"
+    },
+    {
+      "name": "P2_email_Receiver",
+      "title": "P2 Graylog Receiver",
+      "description": "Distribution group to receive priority TWO alert",
+      "type": "string",
+      "default_value": "<Distribution group email address>"
+    },
+    {
+      "name": "P1_email_receiver",
+      "title": "P1 Graylog Receiver",
+      "description": "Priority ONE receiving distribution group",
+      "type": "string",
+      "default_value": "<Distribution group e-mail address>"
+    }
+  ],
+  "entities": [
+    {
+      "v": "1",
+      "type": {
+        "name": "lookup_adapter",
+        "version": "1"
+      },
+      "id": "18f59777-12c2-441f-9656-800026cb8eb2",
+      "data": {
+        "name": {
+          "@type": "string",
+          "@value": "cmg_dns_internal"
+        },
+        "title": {
+          "@type": "string",
+          "@value": "CMG_DNS_internal"
+        },
+        "description": {
+          "@type": "string",
+          "@value": "PTR lookup on internal IP"
+        },
+        "configuration": {
+          "type": {
+            "@type": "string",
+            "@value": "dnslookup"
+          },
+          "lookup_type": {
+            "@type": "string",
+            "@value": "PTR"
+          },
+          "server_ips": {
+            "@value": "DNS_IPs",
+            "@type": "parameter"
+          },
+          "request_timeout": {
+            "@type": "integer",
+            "@value": 10000
+          },
+          "cache_ttl_override_enabled": {
+            "@type": "boolean",
+            "@value": false
+          }
+        }
+      },
+      "constraints": [
+        {
+          "type": "server-version",
+          "version": ">=3.0.1+de74b68"
+        }
+      ]
+    },
+    {
+      "v": "1",
+      "type": {
+        "name": "stream",
+        "version": "1"
+      },
+      "id": "7bbdff83-1c2b-4cd1-93c7-cfc4bbccd83f",
+      "data": {
+        "alarm_callbacks": [
+          {
+            "type": "org.graylog2.alarmcallbacks.EmailAlarmCallback",
+            "title": {
+              "@type": "string",
+              "@value": "P1-Alert notification"
+            },
+            "stream_id": "5c23b32e50f8c603bcfd7f06",
+            "configuration": {
+              "user_receivers": [],
+              "body": {
+                "@type": "string",
+                "@value": "${foreach backlog message}\n${if message.fields.cmg_body}\nTEST-ALERT: \n${message.fields.cmg_body}\n${else}\nTEST-ALERT: \n${message.fields.message}\n${end}\n${end}\n\n${if stream_url}Stream URL: ${stream_url}${end}\n##########\n\n${if backlog}\nLast messages accounting for this alert:\n${foreach backlog message}${message}\n\n${end}${else}<No backlog>\n${end}\n"
+              },
+              "sender": {
+                "@value": "P1_email_sender",
+                "@type": "parameter"
+              },
+              "subject": {
+                "@type": "string",
+                "@value": "${foreach backlog message}${message.fields.cmg_subject}${end}"
+              },
+              "email_receivers": [
+                {
+                  "@value": "P1_email_receiver",
+                  "@type": "parameter"
+                }
+             ]
+            }
+          }
+        ],
+        "outputs": [],
+        "remove_matches": {
+          "@type": "boolean",
+          "@value": true
+        },
+        "title": {
+          "@type": "string",
+          "@value": "P1-Alert"
+        },
+        "stream_rules": [],
+        "alert_conditions": [
+          {
+            "type": "message_count",
+            "title": {
+              "@type": "string",
+              "@value": "Priority 1 Event - High Notification - E-mail and SMS"
+            },
+            "parameters": {
+              "backlog": {
+                "@type": "integer",
+                "@value": 5
+              },
+              "repeat_notifications": {
+                "@type": "boolean",
+                "@value": false
+              },
+              "query": {
+                "@type": "string",
+                "@value": "*"
+              },
+              "grace": {
+                "@type": "integer",
+                "@value": 0
+              },
+              "threshold_type": {
+                "@type": "string",
+                "@value": "MORE"
+              },
+              "threshold": {
+                "@type": "integer",
+                "@value": 0
+              },
+              "time": {
+                "@type": "integer",
+                "@value": 2
+              }
+            }
+          }
+        ],
+        "matching_type": {
+          "@type": "string",
+          "@value": "AND"
+        },
+        "disabled": {
+          "@type": "boolean",
+          "@value": false
+        },
+        "description": {
+          "@type": "string",
+          "@value": "All Priority One Alerts for e-mail and SMS"
+        },
+        "default_stream": {
+          "@type": "boolean",
+          "@value": false
+        }
+      },
+      "constraints": [
+        {
+          "type": "server-version",
+          "version": ">=3.0.1+de74b68"
+        }
+      ]
+    },
+    {
+      "v": "1",
+      "type": {
+        "name": "sidecar_collector_configuration",
+        "version": "1"
+      },
+      "id": "00e48071-3c02-4c43-a272-c7e7fea6ebcc",
+      "data": {
+        "collector_id": {
+          "@type": "string",
+          "@value": "3150a544-6b18-42de-8ac9-ce8d26f56fe5"
+        },
+        "title": {
+          "@type": "string",
+          "@value": "WinLogsDefault"
+        },
+        "color": {
+          "@type": "string",
+          "@value": "#1976d2"
+        },
+        "template": {
+          "@type": "string",
+          "@value": "# Needed for Graylog\nfields_under_root: true\nfields.collector_node_id: ${sidecar.nodeName}\nfields.gl2_source_collector: ${sidecar.nodeId}\n\noutput.logstash:\n   hosts: [\"${user.BeatsInput}\"]\npath:\n  data: C:\\Program Files\\Graylog\\sidecar\\cache\\winlogbeat\\data\n  logs: C:\\Program Files\\Graylog\\sidecar\\logs\ntags:\n - windows\nwinlogbeat:\n  event_logs:\n   - name: Application\n   - name: System\n   - name: Security"
+        }
+      },
+      "constraints": [
+        {
+          "type": "server-version",
+          "version": ">=3.0.1+de74b68"
+        }
+      ]
+    },
+    {
+      "v": "1",
+      "type": {
+        "name": "stream",
+        "version": "1"
+      },
+      "id": "657c891b-a355-411f-bf51-15577affb51a",
+      "data": {
+        "alarm_callbacks": [],
+        "outputs": [],
+        "remove_matches": {
+          "@type": "boolean",
+          "@value": true
+        },
+        "title": {
+          "@type": "string",
+          "@value": "winShortLifeStream"
+        },
+        "stream_rules": [
+          {
+            "type": {
+              "@type": "string",
+              "@value": "EXACT"
+            },
+            "field": {
+              "@type": "string",
+              "@value": "winlogbeat_winlog_api"
+            },
+            "value": {
+              "@type": "string",
+              "@value": "wineventlog"
+            },
+            "inverted": {
+              "@type": "boolean",
+              "@value": false
+            },
+            "description": {
+              "@type": "string",
+              "@value": "Windows Event Log instance"
+            }
+          },
+          {
+            "type": {
+              "@type": "string",
+              "@value": "EXACT"
+            },
+            "field": {
+              "@type": "string",
+              "@value": "winlogbeat_log_level"
+            },
+            "value": {
+              "@type": "string",
+              "@value": "Information"
+            },
+            "inverted": {
+              "@type": "boolean",
+              "@value": false
+            },
+            "description": {
+              "@type": "string",
+              "@value": "Windows log Information instance"
+            }
+          }
+        ],
+        "alert_conditions": [],
+        "matching_type": {
+          "@type": "string",
+          "@value": "AND"
+        },
+        "disabled": {
+          "@type": "boolean",
+          "@value": false
+        },
+        "description": {
+          "@type": "string",
+          "@value": "Windows - Information logs"
+        },
+        "default_stream": {
+          "@type": "boolean",
+          "@value": false
+        }
+      },
+      "constraints": [
+        {
+          "type": "server-version",
+          "version": ">=3.0.1+de74b68"
+        }
+      ]
+    },
+    {
+      "v": "1",
+      "type": {
+        "name": "lookup_table",
+        "version": "1"
+      },
+      "id": "f2e9ca77-3902-4fda-8d03-1c58f092eaea",
+      "data": {
+        "default_single_value_type": {
+          "@type": "string",
+          "@value": "NULL"
+        },
+        "cache_name": {
+          "@type": "string",
+          "@value": "43e7e618-ff6d-4187-951e-b880ecb03ffd"
+        },
+        "name": {
+          "@type": "string",
+          "@value": "CMG_DNS_table"
+        },
+        "default_multi_value_type": {
+          "@type": "string",
+          "@value": "NULL"
+        },
+        "default_multi_value": {
+          "@type": "string",
+          "@value": ""
+        },
+        "data_adapter_name": {
+          "@type": "string",
+          "@value": "18f59777-12c2-441f-9656-800026cb8eb2"
+        },
+        "title": {
+          "@type": "string",
+          "@value": "CMG_DNS_table"
+        },
+        "default_single_value": {
+          "@type": "string",
+          "@value": ""
+        },
+        "description": {
+          "@type": "string",
+          "@value": "DNS table PTR to internal hosts"
+        }
+      },
+      "constraints": [
+        {
+          "type": "server-version",
+          "version": ">=3.0.1+de74b68"
+        }
+      ]
+    },
+    {
+      "v": "1",
+      "type": {
+        "name": "sidecar_collector",
+        "version": "1"
+      },
+      "id": "3150a544-6b18-42de-8ac9-ce8d26f56fe5",
+      "data": {
+        "name": {
+          "@type": "string",
+          "@value": "winlogbeat"
+        },
+        "service_type": {
+          "@type": "string",
+          "@value": "svc"
+        },
+        "node_operating_system": {
+          "@type": "string",
+          "@value": "windows"
+        },
+        "executable_path": {
+          "@type": "string",
+          "@value": "C:\\Program Files\\Graylog\\sidecar\\winlogbeat.exe"
+        },
+        "execute_parameters": {
+          "@type": "string",
+          "@value": "-c \"%s\""
+        },
+        "validation_parameters": {
+          "@type": "string",
+          "@value": "test config -c \"%s\""
+        },
+        "default_template": {
+          "@type": "string",
+          "@value": "# Needed for Graylog\nfields_under_root: true\nfields.collector_node_id: ${sidecar.nodeName}\nfields.gl2_source_collector: ${sidecar.nodeId}\n\noutput.logstash:\n   hosts: \n   - ${user.BeatsInput}\npath:\n  data: C:\\Program Files\\Graylog\\sidecar\\cache\\winlogbeat\\data\n  logs: C:\\Program Files\\Graylog\\sidecar\\logs\ntags:\n - windows\nwinlogbeat:\n  event_logs:\n   - name: Application\n   - name: System\n   - name: Security"
+        }
+      },
+      "constraints": [
+        {
+          "type": "server-version",
+          "version": ">=3.0.1+de74b68"
+        }
+      ]
+    },
+    {
+      "v": "1",
+      "type": {
+        "name": "pipeline",
+        "version": "1"
+      },
+      "id": "e005216d-8602-4c32-b6d5-8d3922788ba5",
+      "data": {
+        "title": {
+          "@type": "string",
+          "@value": "P1-P2: ALERT MARKER"
+        },
+        "description": {
+          "@type": "string",
+          "@value": "Marks Alerts coming into P1 and P2 alerts as such to fire off conditions."
+        },
+        "source": {
+          "@type": "string",
+          "@value": "pipeline \"P1-P2: ALERT MARKER\"\nstage 0 match all\nrule \"AP1-2_Create_Alert_Marker\"\nend"
+        },
+        "connected_streams": [
+          {
+            "@type": "string",
+            "@value": "7bbdff83-1c2b-4cd1-93c7-cfc4bbccd83f"
+          },
+          {
+            "@type": "string",
+            "@value": "162df195-9793-4247-a1c4-fdbdb8bd81bc"
+          }
+        ]
+      },
+      "constraints": [
+        {
+          "type": "server-version",
+          "version": ">=3.0.1+de74b68"
+        }
+      ]
+    },
+    {
+      "v": "1",
+      "type": {
+        "name": "lookup_adapter",
+        "version": "1"
+      },
+      "id": "46e909ae-de42-4b3a-baa1-9e62f5b67799",
+      "data": {
+        "name": {
+          "@type": "string",
+          "@value": "winadlogonerrcode"
+        },
+        "title": {
+          "@type": "string",
+          "@value": "winADlogonErrCode"
+        },
+        "description": {
+          "@type": "string",
+          "@value": "Windows Logon Error Codes"
+        },
+        "configuration": {
+          "type": {
+            "@type": "string",
+            "@value": "csvfile"
+          },
+          "path": {
+            "@type": "string",
+            "@value": "/etc/graylog/login_failure_code.csv"
+          },
+          "separator": {
+            "@type": "string",
+            "@value": ","
+          },
+          "quotechar": {
+            "@type": "string",
+            "@value": "\""
+          },
+          "key_column": {
+            "@type": "string",
+            "@value": "err_code"
+          },
+          "value_column": {
+            "@type": "string",
+            "@value": "explanation"
+          },
+          "check_interval": {
+            "@type": "long",
+            "@value": 60
+          },
+          "case_insensitive_lookup": {
+            "@type": "boolean",
+            "@value": true
+          }
+        }
+      },
+      "constraints": [
+        {
+          "type": "server-version",
+          "version": ">=3.0.1+de74b68"
+        }
+      ]
+    },
+    {
+      "v": "1",
+      "type": {
+        "name": "pipeline",
+        "version": "1"
+      },
+      "id": "56ebeee1-b0fa-4fc4-b46f-93f3276fa0f2",
+      "data": {
+        "title": {
+          "@type": "string",
+          "@value": "winSECAlert Pipeline"
+        },
+        "description": {
+          "@type": "string",
+          "@value": "Security Alerts to notify on User, Machine, Group, OU"
+        },
+        "source": {
+          "@type": "string",
+          "@value": "pipeline \"winSECAlert Pipeline\"\nstage 0 match either\nrule \"WinSECAlert StageOne\"\nrule \"WinSECAlert Stage0DropSet\"\nstage 1 match either\nrule \"AP3-WinSec-BadPw\"\nrule \"AP3-WinSec-UserPWChange\"\nrule \"AP2-WinSec-UserEnableDisable\"\nrule \"AP2-WinSec-AdminPWChange\"\nrule \"AP2-WinSec-UserDeleted\"\nrule \"AP2-WinSec-UserNameChange\"\nrule \"AP2-WinSec-UserLockChange\"\nrule \"AP2-WinSec-NewUser\"\nrule \"AP3-WinSec-BadPw-Kerberos\"\nrule \"WinSECAlert StageTwo\"\nstage 2 match either\nrule \"AP2-WinSec-GroupDeleted\"\nrule \"AP3-WinSec-GroupChanged\"\nrule \"AP2-WinSec-NewGroupCreated\"\nrule \"AP2-WinSec-NewGroupMember\"\nrule \"AP2-WinSec-GroupMemberDelete\"\nrule \"WinSECAlert StageThree\"\nstage 3 match either\nrule \"AP2-WinSec-NewOU\"\nrule \"AP2-WinSec-OU-Deleted\"\nrule \"AP2-WinSec-OU-Changed\"\nrule \"AP2-WinSec-OU-Moved\"\nend"
+        },
+        "connected_streams": [
+          {
+            "@type": "string",
+            "@value": "657c891b-a355-411f-bf51-15577affb51a"
+          },
+          {
+            "@type": "string",
+            "@value": "6df71f21-b629-41cc-a7f2-cf5b5030db39"
+          }
+        ]
+      },
+      "constraints": [
+        {
+          "type": "server-version",
+          "version": ">=3.0.1+de74b68"
+        }
+      ]
+    },
+    {
+      "v": "1",
+      "type": {
+        "name": "stream",
+        "version": "1"
+      },
+      "id": "6df71f21-b629-41cc-a7f2-cf5b5030db39",
+      "data": {
+        "alarm_callbacks": [],
+        "outputs": [],
+        "remove_matches": {
+          "@type": "boolean",
+          "@value": true
+        },
+        "title": {
+          "@type": "string",
+          "@value": "WinWarnError"
+        },
+        "stream_rules": [
+          {
+            "type": {
+              "@type": "string",
+              "@value": "EXACT"
+            },
+            "field": {
+              "@type": "string",
+              "@value": "winlogbeat_winlog_api"
+            },
+            "value": {
+              "@type": "string",
+              "@value": "wineventlog"
+            },
+            "inverted": {
+              "@type": "boolean",
+              "@value": false
+            },
+            "description": {
+              "@type": "string",
+              "@value": ""
+            }
+          },
+          {
+            "type": {
+              "@type": "string",
+              "@value": "REGEX"
+            },
+            "field": {
+              "@type": "string",
+              "@value": "winlogbeat_log_level"
+            },
+            "value": {
+              "@type": "string",
+              "@value": "[Ww]arning|[Ee]rror"
+            },
+            "inverted": {
+              "@type": "boolean",
+              "@value": false
+            },
+            "description": {
+              "@type": "string",
+              "@value": "Catch all warning and Error Level logs from Windows"
+            }
+          }
+        ],
+        "alert_conditions": [],
+        "matching_type": {
+          "@type": "string",
+          "@value": "AND"
+        },
+        "disabled": {
+          "@type": "boolean",
+          "@value": false
+        },
+        "description": {
+          "@type": "string",
+          "@value": "Windows- Warning and Error Logs"
+        },
+        "default_stream": {
+          "@type": "boolean",
+          "@value": false
+        }
+      },
+      "constraints": [
+        {
+          "type": "server-version",
+          "version": ">=3.0.1+de74b68"
+        }
+      ]
+    },
+    {
+      "v": "1",
+      "type": {
+        "name": "lookup_table",
+        "version": "1"
+      },
+      "id": "05c06bc6-df43-4998-9ef1-b2c26f0112da",
+      "data": {
+        "default_single_value_type": {
+          "@type": "string",
+          "@value": "NULL"
+        },
+        "cache_name": {
+          "@type": "string",
+          "@value": "43e7e618-ff6d-4187-951e-b880ecb03ffd"
+        },
+        "name": {
+          "@type": "string",
+          "@value": "admin_groups"
+        },
+        "default_multi_value_type": {
+          "@type": "string",
+          "@value": "NULL"
+        },
+        "default_multi_value": {
+          "@type": "string",
+          "@value": ""
+        },
+        "data_adapter_name": {
+          "@type": "string",
+          "@value": "ce0a742e-8eaa-45c4-b9a8-e8d3b3f75237"
+        },
+        "title": {
+          "@type": "string",
+          "@value": "ADadmingroups"
+        },
+        "default_single_value": {
+          "@type": "string",
+          "@value": ""
+        },
+        "description": {
+          "@type": "string",
+          "@value": "AD Groups with special privleges"
+        }
+      },
+      "constraints": [
+        {
+          "type": "server-version",
+          "version": ">=3.0.1+de74b68"
+        }
+      ]
+    },
+    {
+      "v": "1",
+      "type": {
+        "name": "lookup_adapter",
+        "version": "1"
+      },
+      "id": "769d2933-74f6-4a45-ac61-b2559d1393ec",
+      "data": {
+        "name": {
+          "@type": "string",
+          "@value": "winlogontypeadaptor"
+        },
+        "title": {
+          "@type": "string",
+          "@value": "WinLogonTypeAdaptor"
+        },
+        "description": {
+          "@type": "string",
+          "@value": "Pull Logon Types from CSV"
+        },
+        "configuration": {
+          "type": {
+            "@type": "string",
+            "@value": "csvfile"
+          },
+          "path": {
+            "@type": "string",
+            "@value": "/etc/graylog/login_types.csv"
+          },
+          "separator": {
+            "@type": "string",
+            "@value": ","
+          },
+          "quotechar": {
+            "@type": "string",
+            "@value": "\""
+          },
+          "key_column": {
+            "@type": "string",
+            "@value": "number"
+          },
+          "value_column": {
+            "@type": "string",
+            "@value": "type"
+          },
+          "check_interval": {
+            "@type": "long",
+            "@value": 60
+          },
+          "case_insensitive_lookup": {
+            "@type": "boolean",
+            "@value": false
+          }
+        }
+      },
+      "constraints": [
+        {
+          "type": "server-version",
+          "version": ">=3.0.1+de74b68"
+        }
+      ]
+    },
+    {
+      "v": "1",
+      "type": {
+        "name": "sidecar_collector_configuration",
+        "version": "1"
+      },
+      "id": "7982f514-e3f9-4e79-be3b-467370e9b0b4",
+      "data": {
+        "collector_id": {
+          "@type": "string",
+          "@value": "3150a544-6b18-42de-8ac9-ce8d26f56fe5"
+        },
+        "title": {
+          "@type": "string",
+          "@value": "WinLogs-DC"
+        },
+        "color": {
+          "@type": "string",
+          "@value": "#ffa000"
+        },
+        "template": {
+          "@type": "string",
+          "@value": "# Needed for Graylog\nfields_under_root: true\nfields.collector_node_id: ${sidecar.nodeName}\nfields.gl2_source_collector: ${sidecar.nodeId}\n\noutput.logstash:\n   hosts: [\"${user.BeatsInput}\"]\npath:\n  data: C:\\Program Files\\Graylog\\sidecar\\cache\\winlogbeat\\data\n  logs: C:\\Program Files\\Graylog\\sidecar\\logs\ntags:\n - windows\n - DC\nwinlogbeat:\n  event_logs:\n   - name: Application\n   - name: System\n   - name: Security\n   - name: DFS Replication\n   - name: Directory Service\n   - name: DNS Server\n   - name: File Replication Service\n  "
+        }
+      },
+      "constraints": [
+        {
+          "type": "server-version",
+          "version": ">=3.0.1+de74b68"
+        }
+      ]
+    },
+    {
+      "v": "1",
+      "type": {
+        "name": "lookup_cache",
+        "version": "1"
+      },
+      "id": "191dbdd2-2976-49c9-a66f-dfdd9e747a62",
+      "data": {
+        "name": {
+          "@type": "string",
+          "@value": "winlogonerrcache"
+        },
+        "title": {
+          "@type": "string",
+          "@value": "winLogonErrCache"
+        },
+        "description": {
+          "@type": "string",
+          "@value": "Logon Error Translator"
+        },
+        "configuration": {
+          "type": {
+            "@type": "string",
+            "@value": "guava_cache"
+          },
+          "max_size": {
+            "@type": "integer",
+            "@value": 100
+          },
+          "expire_after_access": {
+            "@type": "long",
+            "@value": 60
+          },
+          "expire_after_access_unit": {
+            "@type": "string",
+            "@value": "SECONDS"
+          },
+          "expire_after_write": {
+            "@type": "long",
+            "@value": 0
+          }
+        }
+      },
+      "constraints": [
+        {
+          "type": "server-version",
+          "version": ">=3.0.1+de74b68"
+        }
+      ]
+    },
+    {
+      "v": "1",
+      "type": {
+        "name": "lookup_cache",
+        "version": "1"
+      },
+      "id": "e3a86cf5-4d47-4343-8799-109653b8a838",
+      "data": {
+        "name": {
+          "@type": "string",
+          "@value": "logontypecache"
+        },
+        "title": {
+          "@type": "string",
+          "@value": "LogonTypeCache"
+        },
+        "description": {
+          "@type": "string",
+          "@value": "Cache Logon Type conversion"
+        },
+        "configuration": {
+          "type": {
+            "@type": "string",
+            "@value": "guava_cache"
+          },
+          "max_size": {
+            "@type": "integer",
+            "@value": 1000
+          },
+          "expire_after_access": {
+            "@type": "long",
+            "@value": 30
+          },
+          "expire_after_access_unit": {
+            "@type": "string",
+            "@value": "SECONDS"
+          },
+          "expire_after_write": {
+            "@type": "long",
+            "@value": 0
+          }
+        }
+      },
+      "constraints": [
+        {
+          "type": "server-version",
+          "version": ">=3.0.1+de74b68"
+        }
+      ]
+    },
+    {
+      "v": "1",
+      "type": {
+        "name": "pipeline",
+        "version": "1"
+      },
+      "id": "cec77f4a-6e3d-44e0-bdb8-49129c1ea556",
+      "data": {
+        "title": {
+          "@type": "string",
+          "@value": "WinERRPipeline"
+        },
+        "description": {
+          "@type": "string",
+          "@value": "Focus on pulling out Errors and Alerting on them."
+        },
+        "source": {
+          "@type": "string",
+          "@value": "pipeline \"WinERRPipeline\"\nstage 0 match either\nrule \"AP2-WinERR-ExchangeCertExpire\"\nstage 1 match either\nrule \"AP2-WinERR-ExchangeCertExpire-24hrs\"\nend"
+        },
+        "connected_streams": [
+          {
+            "@type": "string",
+            "@value": "6df71f21-b629-41cc-a7f2-cf5b5030db39"
+          }
+        ]
+      },
+      "constraints": [
+        {
+          "type": "server-version",
+          "version": ">=3.0.1+de74b68"
+        }
+      ]
+    },
+    {
+      "v": "1",
+      "type": {
+        "name": "stream",
+        "version": "1"
+      },
+      "id": "2b5ac52f-132d-42c9-a0a3-d4f7a952a577",
+      "data": {
+        "alarm_callbacks": [
+          {
+            "type": "org.graylog2.alarmcallbacks.EmailAlarmCallback",
+            "title": {
+              "@type": "string",
+              "@value": "P2 - e-mail Exchange Cert has 5 Days"
+            },
+            "stream_id": "5c23b39750f8c603bcfd7f7e",
+            "configuration": {
+              "user_receivers": [],
+              "body": {
+                "@type": "string",
+                "@value": "${foreach backlog message}\n${if message.fields.cmg_body}\nALERT: \n${message.fields.cmg_body}\n${else}\nALERT: \n${message.fields.message}\n${end}\n${end}\n\n${if stream_url}Stream URL: ${stream_url}${end}\n##########\n\n${if backlog}\nLast messages accounting for this alert:\n${foreach backlog message}${message}\n\n${end}${else}<No backlog>\n${end}"
+              },
+              "sender": {
+                "@value": "P2_email_sender",
+                "@type": "parameter"
+              },
+              "subject": {
+                "@type": "string",
+                "@value": "${foreach backlog message}${message.fields.cmg_subject}${end}"
+              },
+              "email_receivers": [
+                {
+                  "@value": "P2_email_Receiver",
+                  "@type": "parameter"
+                }
+              ]
+            }
+          }
+        ],
+        "outputs": [],
+        "remove_matches": {
+          "@type": "boolean",
+          "@value": true
+        },
+        "title": {
+          "@type": "string",
+          "@value": "P3-Reporting"
+        },
+        "stream_rules": [],
+        "alert_conditions": [
+          {
+            "type": "field_value",
+            "title": {
+              "@type": "string",
+              "@value": "Exchange Cert Expire less than FIVE days"
+            },
+            "parameters": {
+              "repeat_notifications": {
+                "@type": "boolean",
+                "@value": false
+              },
+              "query": {
+                "@type": "string",
+                "@value": "winlogbeat_event_id:12018"
+              },
+              "threshold": {
+                "@type": "integer",
+                "@value": 120
+              },
+              "time": {
+                "@type": "integer",
+                "@value": 20
+              },
+              "threshold_type": {
+                "@type": "string",
+                "@value": "LOWER"
+              },
+              "grace": {
+                "@type": "integer",
+                "@value": 5
+              },
+              "field": {
+                "@type": "string",
+                "@value": "cert_hours_left"
+              },
+              "type": {
+                "@type": "string",
+                "@value": "MAX"
+              },
+              "backlog": {
+                "@type": "integer",
+                "@value": 1
+              }
+            }
+          }
+        ],
+        "matching_type": {
+          "@type": "string",
+          "@value": "AND"
+        },
+        "disabled": {
+          "@type": "boolean",
+          "@value": false
+        },
+        "description": {
+          "@type": "string",
+          "@value": "Messages to be reported on - presented in a dashboard"
+        },
+        "default_stream": {
+          "@type": "boolean",
+          "@value": false
+        }
+      },
+      "constraints": [
+        {
+          "type": "server-version",
+          "version": ">=3.0.1+de74b68"
+        }
+      ]
+    },
+    {
+      "v": "1",
+      "type": {
+        "name": "dashboard",
+        "version": "1"
+      },
+      "id": "6492ee51-f9c7-45d7-a19c-72870fdcf10e",
+      "data": {
+        "title": {
+          "@type": "string",
+          "@value": "AD Events - last 2h"
+        },
+        "description": {
+          "@type": "string",
+          "@value": "AD Events in the last 2 hours"
+        },
+        "widgets": [
+          {
+            "id": {
+              "@type": "string",
+              "@value": "be915bd4-fee5-4ac2-82c7-0db60db91e8f"
+            },
+            "description": {
+              "@type": "string",
+              "@value": "Interactive Logon - User & Service-* "
+            },
+            "type": {
+              "@type": "string",
+              "@value": "STACKED_CHART"
+            },
+            "cache_time": {
+              "@type": "integer",
+              "@value": 10
+            },
+            "time_range": {
+              "type": {
+                "@type": "string",
+                "@value": "relative"
+              },
+              "range": {
+                "@type": "integer",
+                "@value": 7200
+              }
+            },
+            "configuration": {
+              "timerange": {
+                "type": {
+                  "@type": "string",
+                  "@value": "relative"
+                },
+                "range": {
+                  "@type": "integer",
+                  "@value": 7200
+                }
+              },
+              "renderer": {
+                "@type": "string",
+                "@value": "area"
+              },
+              "interpolation": {
+                "@type": "string",
+                "@value": "linear"
+              },
+              "stream_id": {
+                "@type": "string",
+                "@value": "657c891b-a355-411f-bf51-15577affb51a"
+              },
+              "series": [],
+              "interval": {
+                "@type": "string",
+                "@value": "minute"
+              }
+            },
+            "position": {
+              "width": {
+                "@type": "integer",
+                "@value": 4
+              },
+              "height": {
+                "@type": "integer",
+                "@value": 3
+              },
+              "row": {
+                "@type": "integer",
+                "@value": 3
+              },
+              "col": {
+                "@type": "integer",
+                "@value": 1
+              }
+            }
+          },
+          {
+            "id": {
+              "@type": "string",
+              "@value": "4167fffd-83b3-44eb-9c49-bdb31d527a2e"
+            },
+            "description": {
+              "@type": "string",
+              "@value": "P3-Reporting"
+            },
+            "type": {
+              "@type": "string",
+              "@value": "STREAM_SEARCH_RESULT_COUNT"
+            },
+            "cache_time": {
+              "@type": "integer",
+              "@value": 10
+            },
+            "time_range": {
+              "type": {
+                "@type": "string",
+                "@value": "relative"
+              },
+              "range": {
+                "@type": "integer",
+                "@value": 7200
+              }
+            },
+            "configuration": {
+              "timerange": {
+                "type": {
+                  "@type": "string",
+                  "@value": "relative"
+                },
+                "range": {
+                  "@type": "integer",
+                  "@value": 7200
+                }
+              },
+              "lower_is_better": {
+                "@type": "boolean",
+                "@value": false
+              },
+              "stream_id": {
+                "@type": "string",
+                "@value": "2b5ac52f-132d-42c9-a0a3-d4f7a952a577"
+              },
+              "trend": {
+                "@type": "boolean",
+                "@value": false
+              },
+              "query": {
+                "@type": "string",
+                "@value": ""
+              }
+            },
+            "position": {
+              "width": {
+                "@type": "integer",
+                "@value": 2
+              },
+              "height": {
+                "@type": "integer",
+                "@value": 2
+              },
+              "row": {
+                "@type": "integer",
+                "@value": 6
+              },
+              "col": {
+                "@type": "integer",
+                "@value": 5
+              }
+            }
+          },
+          {
+            "id": {
+              "@type": "string",
+              "@value": "b99b351d-e262-439d-b119-73279ad7f8c0"
+            },
+            "description": {
+              "@type": "string",
+              "@value": "Priority ONE Alerts"
+            },
+            "type": {
+              "@type": "string",
+              "@value": "STREAM_SEARCH_RESULT_COUNT"
+            },
+            "cache_time": {
+              "@type": "integer",
+              "@value": 10
+            },
+            "time_range": {
+              "type": {
+                "@type": "string",
+                "@value": "relative"
+              },
+              "range": {
+                "@type": "integer",
+                "@value": 7200
+              }
+            },
+            "configuration": {
+              "timerange": {
+                "type": {
+                  "@type": "string",
+                  "@value": "relative"
+                },
+                "range": {
+                  "@type": "integer",
+                  "@value": 7200
+                }
+              },
+              "lower_is_better": {
+                "@type": "boolean",
+                "@value": true
+              },
+              "stream_id": {
+                "@type": "string",
+                "@value": "7bbdff83-1c2b-4cd1-93c7-cfc4bbccd83f"
+              },
+              "trend": {
+                "@type": "boolean",
+                "@value": false
+              },
+              "query": {
+                "@type": "string",
+                "@value": ""
+              }
+            },
+            "position": {
+              "width": {
+                "@type": "integer",
+                "@value": 2
+              },
+              "height": {
+                "@type": "integer",
+                "@value": 2
+              },
+              "row": {
+                "@type": "integer",
+                "@value": 6
+              },
+              "col": {
+                "@type": "integer",
+                "@value": 1
+              }
+            }
+          },
+          {
+            "id": {
+              "@type": "string",
+              "@value": "e47b51cb-cc7d-404f-a46b-2218162006ab"
+            },
+            "description": {
+              "@type": "string",
+              "@value": "Logon Failures"
+            },
+            "type": {
+              "@type": "string",
+              "@value": "FIELD_CHART"
+            },
+            "cache_time": {
+              "@type": "integer",
+              "@value": 10
+            },
+            "time_range": {
+              "type": {
+                "@type": "string",
+                "@value": "relative"
+              },
+              "range": {
+                "@type": "integer",
+                "@value": 7200
+              }
+            },
+            "configuration": {
+              "renderer": {
+                "@type": "string",
+                "@value": "area"
+              },
+              "interpolation": {
+                "@type": "string",
+                "@value": "linear"
+              },
+              "interval": {
+                "@type": "string",
+                "@value": "minute"
+              },
+              "query": {
+                "@type": "string",
+                "@value": "(winlogbeat_event_id:4625 OR winlogbeat_event_id:4771 OR winlogbeat_event_id:4820) "
+              },
+              "valuetype": {
+                "@type": "string",
+                "@value": "count"
+              },
+              "relative": {
+                "@type": "integer",
+                "@value": 7200
+              },
+              "timerange": {
+                "type": {
+                  "@type": "string",
+                  "@value": "relative"
+                },
+                "range": {
+                  "@type": "integer",
+                  "@value": 7200
+                }
+              },
+              "rangeType": {
+                "@type": "string",
+                "@value": "relative"
+              },
+              "field": {
+                "@type": "string",
+                "@value": "winlogbeat_event_id"
+              },
+              "stream_id": {
+                "@type": "string",
+                "@value": "657c891b-a355-411f-bf51-15577affb51a"
+              }
+            },
+            "position": {
+              "width": {
+                "@type": "integer",
+                "@value": 4
+              },
+              "height": {
+                "@type": "integer",
+                "@value": 2
+              },
+              "row": {
+                "@type": "integer",
+                "@value": 1
+              },
+              "col": {
+                "@type": "integer",
+                "@value": 1
+              }
+            }
+          },
+          {
+            "id": {
+              "@type": "string",
+              "@value": "d2d8d33b-db64-41f5-b8dd-442e3e816400"
+            },
+            "description": {
+              "@type": "string",
+              "@value": "Failed Auth - User"
+            },
+            "type": {
+              "@type": "string",
+              "@value": "QUICKVALUES"
+            },
+            "cache_time": {
+              "@type": "integer",
+              "@value": 10
+            },
+            "time_range": {
+              "type": {
+                "@type": "string",
+                "@value": "relative"
+              },
+              "range": {
+                "@type": "integer",
+                "@value": 7200
+              }
+            },
+            "configuration": {
+              "query": {
+                "@value": "AuthEvent_minus_DC",
+                "@type": "parameter"
+              },
+              "show_pie_chart": {
+                "@type": "boolean",
+                "@value": false
+              },
+              "sort_order": {
+                "@type": "string",
+                "@value": "desc"
+              },
+              "timerange": {
+                "type": {
+                  "@type": "string",
+                  "@value": "relative"
+                },
+                "range": {
+                  "@type": "integer",
+                  "@value": 7200
+                }
+              },
+              "stacked_fields": {
+                "@type": "string",
+                "@value": "cmg_requestingName"
+              },
+              "data_table_limit": {
+                "@type": "integer",
+                "@value": 50
+              },
+              "field": {
+                "@type": "string",
+                "@value": "winlogbeat_event_data_TargetUserName"
+              },
+              "stream_id": {
+                "@type": "string",
+                "@value": "657c891b-a355-411f-bf51-15577affb51a"
+              },
+              "show_data_table": {
+                "@type": "boolean",
+                "@value": true
+              },
+              "limit": {
+                "@type": "integer",
+                "@value": 5
+              }
+            },
+            "position": {
+              "width": {
+                "@type": "integer",
+                "@value": 3
+              },
+              "height": {
+                "@type": "integer",
+                "@value": 3
+              },
+              "row": {
+                "@type": "integer",
+                "@value": 1
+              },
+              "col": {
+                "@type": "integer",
+                "@value": 5
+              }
+            }
+          },
+          {
+            "id": {
+              "@type": "string",
+              "@value": "4170805f-a43e-4371-96cd-f01ad0f0f7d8"
+            },
+            "description": {
+              "@type": "string",
+              "@value": "Priority TWO Alerts"
+            },
+            "type": {
+              "@type": "string",
+              "@value": "STREAM_SEARCH_RESULT_COUNT"
+            },
+            "cache_time": {
+              "@type": "integer",
+              "@value": 10
+            },
+            "time_range": {
+              "type": {
+                "@type": "string",
+                "@value": "relative"
+              },
+              "range": {
+                "@type": "integer",
+                "@value": 7200
+              }
+            },
+            "configuration": {
+              "timerange": {
+                "type": {
+                  "@type": "string",
+                  "@value": "relative"
+                },
+                "range": {
+                  "@type": "integer",
+                  "@value": 7200
+                }
+              },
+              "lower_is_better": {
+                "@type": "boolean",
+                "@value": false
+              },
+              "stream_id": {
+                "@type": "string",
+                "@value": "162df195-9793-4247-a1c4-fdbdb8bd81bc"
+              },
+              "trend": {
+                "@type": "boolean",
+                "@value": false
+              },
+              "query": {
+                "@type": "string",
+                "@value": ""
+              }
+            },
+            "position": {
+              "width": {
+                "@type": "integer",
+                "@value": 2
+              },
+              "height": {
+                "@type": "integer",
+                "@value": 2
+              },
+              "row": {
+                "@type": "integer",
+                "@value": 6
+              },
+              "col": {
+                "@type": "integer",
+                "@value": 3
+              }
+            }
+          },
+          {
+            "id": {
+              "@type": "string",
+              "@value": "15018113-84bf-41a8-9eda-f8e38046db21"
+            },
+            "description": {
+              "@type": "string",
+              "@value": "Failed Auth - Machine"
+            },
+            "type": {
+              "@type": "string",
+              "@value": "QUICKVALUES"
+            },
+            "cache_time": {
+              "@type": "integer",
+              "@value": 10
+            },
+            "time_range": {
+              "type": {
+                "@type": "string",
+                "@value": "relative"
+              },
+              "range": {
+                "@type": "integer",
+                "@value": 7200
+              }
+            },
+            "configuration": {
+              "query": {
+                "@value": "AuthEvent_minus_DC",
+                "@type": "parameter"
+              },
+              "show_pie_chart": {
+                "@type": "boolean",
+                "@value": false
+              },
+              "sort_order": {
+                "@type": "string",
+                "@value": "desc"
+              },
+              "timerange": {
+                "type": {
+                  "@type": "string",
+                  "@value": "relative"
+                },
+                "range": {
+                  "@type": "integer",
+                  "@value": 7200
+                }
+              },
+              "stacked_fields": {
+                "@type": "string",
+                "@value": "winlogbeat_event_data_TargetUserName"
+              },
+              "data_table_limit": {
+                "@type": "integer",
+                "@value": 50
+              },
+              "field": {
+                "@type": "string",
+                "@value": "cmg_requestingName"
+              },
+              "stream_id": {
+                "@type": "string",
+                "@value": "657c891b-a355-411f-bf51-15577affb51a"
+              },
+              "show_data_table": {
+                "@type": "boolean",
+                "@value": true
+              },
+              "limit": {
+                "@type": "integer",
+                "@value": 5
+              }
+            },
+            "position": {
+              "width": {
+                "@type": "integer",
+                "@value": 3
+              },
+              "height": {
+                "@type": "integer",
+                "@value": 3
+              },
+              "row": {
+                "@type": "integer",
+                "@value": 1
+              },
+              "col": {
+                "@type": "integer",
+                "@value": 8
+              }
+            }
+          },
+          {
+            "id": {
+              "@type": "string",
+              "@value": "43cd9611-b31e-4c57-83fa-115ee6f72d17"
+            },
+            "description": {
+              "@type": "string",
+              "@value": "Warnings & Errors"
+            },
+            "type": {
+              "@type": "string",
+              "@value": "STREAM_SEARCH_RESULT_COUNT"
+            },
+            "cache_time": {
+              "@type": "integer",
+              "@value": 10
+            },
+            "time_range": {
+              "type": {
+                "@type": "string",
+                "@value": "relative"
+              },
+              "range": {
+                "@type": "integer",
+                "@value": 7200
+              }
+            },
+            "configuration": {
+              "timerange": {
+                "type": {
+                  "@type": "string",
+                  "@value": "relative"
+                },
+                "range": {
+                  "@type": "integer",
+                  "@value": 7200
+                }
+              },
+              "lower_is_better": {
+                "@type": "boolean",
+                "@value": true
+              },
+              "stream_id": {
+                "@type": "string",
+                "@value": "6df71f21-b629-41cc-a7f2-cf5b5030db39"
+              },
+              "trend": {
+                "@type": "boolean",
+                "@value": true
+              },
+              "query": {
+                "@type": "string",
+                "@value": ""
+              }
+            },
+            "position": {
+              "width": {
+                "@type": "integer",
+                "@value": 2
+              },
+              "height": {
+                "@type": "integer",
+                "@value": 2
+              },
+              "row": {
+                "@type": "integer",
+                "@value": 6
+              },
+              "col": {
+                "@type": "integer",
+                "@value": 7
+              }
+            }
+          },
+          {
+            "id": {
+              "@type": "string",
+              "@value": "cfbab23a-6c3f-4800-b43d-abfd12cadaed"
+            },
+            "description": {
+              "@type": "string",
+              "@value": "Warnings & Errors"
+            },
+            "type": {
+              "@type": "string",
+              "@value": "SEARCH_RESULT_CHART"
+            },
+            "cache_time": {
+              "@type": "integer",
+              "@value": 10
+            },
+            "time_range": {
+              "type": {
+                "@type": "string",
+                "@value": "relative"
+              },
+              "range": {
+                "@type": "integer",
+                "@value": 7200
+              }
+            },
+            "configuration": {
+              "timerange": {
+                "type": {
+                  "@type": "string",
+                  "@value": "relative"
+                },
+                "range": {
+                  "@type": "integer",
+                  "@value": 7200
+                }
+              },
+              "interval": {
+                "@type": "string",
+                "@value": "minute"
+              },
+              "stream_id": {
+                "@type": "string",
+                "@value": "6df71f21-b629-41cc-a7f2-cf5b5030db39"
+              },
+              "query": {
+                "@type": "string",
+                "@value": ""
+              }
+            },
+            "position": {
+              "width": {
+                "@type": "integer",
+                "@value": 6
+              },
+              "height": {
+                "@type": "integer",
+                "@value": 2
+              },
+              "row": {
+                "@type": "integer",
+                "@value": 4
+              },
+              "col": {
+                "@type": "integer",
+                "@value": 5
+              }
+            }
+          }
+        ]
+      },
+      "constraints": [
+        {
+          "type": "server-version",
+          "version": ">=3.0.1+de74b68"
+        }
+      ]
+    },
+    {
+      "v": "1",
+      "type": {
+        "name": "lookup_table",
+        "version": "1"
+      },
+      "id": "9e73355a-5940-4b81-8f88-8cb440d856c2",
+      "data": {
+        "default_single_value_type": {
+          "@type": "string",
+          "@value": "STRING"
+        },
+        "cache_name": {
+          "@type": "string",
+          "@value": "191dbdd2-2976-49c9-a66f-dfdd9e747a62"
+        },
+        "name": {
+          "@type": "string",
+          "@value": "WinLogonErr"
+        },
+        "default_multi_value_type": {
+          "@type": "string",
+          "@value": "NULL"
+        },
+        "default_multi_value": {
+          "@type": "string",
+          "@value": ""
+        },
+        "data_adapter_name": {
+          "@type": "string",
+          "@value": "46e909ae-de42-4b3a-baa1-9e62f5b67799"
+        },
+        "title": {
+          "@type": "string",
+          "@value": "Win Logon Errors"
+        },
+        "default_single_value": {
+          "@type": "string",
+          "@value": "Not Handled in login_failure_code.csv"
+        },
+        "description": {
+          "@type": "string",
+          "@value": "Descriptions of Windows Logon Errors"
+        }
+      },
+      "constraints": [
+        {
+          "type": "server-version",
+          "version": ">=3.0.1+de74b68"
+        }
+      ]
+    },
+    {
+      "v": "1",
+      "type": {
+        "name": "lookup_table",
+        "version": "1"
+      },
+      "id": "2a2eb28d-8f7c-4315-8099-80f093f401c7",
+      "data": {
+        "default_single_value_type": {
+          "@type": "string",
+          "@value": "NULL"
+        },
+        "cache_name": {
+          "@type": "string",
+          "@value": "e3a86cf5-4d47-4343-8799-109653b8a838"
+        },
+        "name": {
+          "@type": "string",
+          "@value": "winLogonType"
+        },
+        "default_multi_value_type": {
+          "@type": "string",
+          "@value": "NULL"
+        },
+        "default_multi_value": {
+          "@type": "string",
+          "@value": ""
+        },
+        "data_adapter_name": {
+          "@type": "string",
+          "@value": "769d2933-74f6-4a45-ac61-b2559d1393ec"
+        },
+        "title": {
+          "@type": "string",
+          "@value": "Win Logon Type"
+        },
+        "default_single_value": {
+          "@type": "string",
+          "@value": ""
+        },
+        "description": {
+          "@type": "string",
+          "@value": "Listing of Logon Types"
+        }
+      },
+      "constraints": [
+        {
+          "type": "server-version",
+          "version": ">=3.0.1+de74b68"
+        }
+      ]
+    },
+    {
+      "v": "1",
+      "type": {
+        "name": "stream",
+        "version": "1"
+      },
+      "id": "162df195-9793-4247-a1c4-fdbdb8bd81bc",
+      "data": {
+        "alarm_callbacks": [
+          {
+            "type": "org.graylog2.alarmcallbacks.EmailAlarmCallback",
+            "title": {
+              "@type": "string",
+              "@value": "P2 - e-mail notification"
+            },
+            "stream_id": "5c23b35d50f8c603bcfd7f3d",
+            "configuration": {
+              "user_receivers": [],
+              "body": {
+                "@type": "string",
+                "@value": "${foreach backlog message}\n${if message.fields.cmg_body}\nALERT: \n${message.fields.cmg_body}\n${else}\nALERT: \n${message.fields.message}\n${end}\n${end}\n\n${if stream_url}Stream URL: ${stream_url}${end}\n##########\n\n${if backlog}\nLast messages accounting for this alert:\n${foreach backlog message}${message}\n\n${end}${else}<No backlog>\n${end}\n"
+              },
+              "sender": {
+                "@value": "P2_email_sender",
+                "@type": "parameter"
+              },
+              "subject": {
+                "@type": "string",
+                "@value": "${foreach backlog message}${message.fields.cmg_subject}${end}"
+              },
+              "email_receivers": [
+                {
+                  "@value": "P2_email_Receiver",
+                  "@type": "parameter"
+                }
+              ]
+            }
+          }
+        ],
+        "outputs": [],
+        "remove_matches": {
+          "@type": "boolean",
+          "@value": true
+        },
+        "title": {
+          "@type": "string",
+          "@value": "P2-Alert"
+        },
+        "stream_rules": [],
+        "alert_conditions": [
+          {
+            "type": "field_content_value",
+            "title": {
+              "@type": "string",
+              "@value": "Priority 2 ALERT- Standard Notification"
+            },
+            "parameters": {
+              "backlog": {
+                "@type": "integer",
+                "@value": 10
+              },
+              "repeat_notifications": {
+                "@type": "boolean",
+                "@value": false
+              },
+              "field": {
+                "@type": "string",
+                "@value": "ALERT"
+              },
+              "query": {
+                "@type": "string",
+                "@value": ""
+              },
+              "grace": {
+                "@type": "integer",
+                "@value": 0
+              },
+              "value": {
+                "@type": "string",
+                "@value": "TRUE"
+              }
+            }
+          },
+          {
+            "type": "message_count",
+            "title": {
+              "@type": "string",
+              "@value": "Priority 2 -50- Event - Standard Notification"
+            },
+            "parameters": {
+              "backlog": {
+                "@type": "integer",
+                "@value": 5
+              },
+              "repeat_notifications": {
+                "@type": "boolean",
+                "@value": false
+              },
+              "query": {
+                "@type": "string",
+                "@value": ""
+              },
+              "grace": {
+                "@type": "integer",
+                "@value": 0
+              },
+              "threshold_type": {
+                "@type": "string",
+                "@value": "MORE"
+              },
+              "threshold": {
+                "@type": "integer",
+                "@value": 50
+              },
+              "time": {
+                "@type": "integer",
+                "@value": 1
+              }
+            }
+          }
+        ],
+        "matching_type": {
+          "@type": "string",
+          "@value": "AND"
+        },
+        "disabled": {
+          "@type": "boolean",
+          "@value": false
+        },
+        "description": {
+          "@type": "string",
+          "@value": "All Priority Two alerts - Only to e-mail"
+        },
+        "default_stream": {
+          "@type": "boolean",
+          "@value": false
+        }
+      },
+      "constraints": [
+        {
+          "type": "server-version",
+          "version": ">=3.0.1+de74b68"
+        }
+      ]
+    },
+    {
+      "v": "1",
+      "type": {
+        "name": "lookup_cache",
+        "version": "1"
+      },
+      "id": "43e7e618-ff6d-4187-951e-b880ecb03ffd",
+      "data": {
+        "name": {
+          "@type": "string",
+          "@value": "adcache"
+        },
+        "title": {
+          "@type": "string",
+          "@value": "ADCache"
+        },
+        "description": {
+          "@type": "string",
+          "@value": "AD Caching"
+        },
+        "configuration": {
+          "type": {
+            "@type": "string",
+            "@value": "guava_cache"
+          },
+          "max_size": {
+            "@type": "integer",
+            "@value": 100
+          },
+          "expire_after_access": {
+            "@type": "long",
+            "@value": 60
+          },
+          "expire_after_access_unit": {
+            "@type": "string",
+            "@value": "SECONDS"
+          },
+          "expire_after_write": {
+            "@type": "long",
+            "@value": 0
+          }
+        }
+      },
+      "constraints": [
+        {
+          "type": "server-version",
+          "version": ">=3.0.1+de74b68"
+        }
+      ]
+    },
+    {
+      "v": "1",
+      "type": {
+        "name": "input",
+        "version": "1"
+      },
+      "id": "5825735e-dadf-4b3e-85ab-214cd76091df",
+      "data": {
+        "title": {
+          "@type": "string",
+          "@value": "winBeats-Input"
+        },
+        "configuration": {
+          "tls_key_file": {
+            "@type": "string",
+            "@value": ""
+          },
+          "port": {
+            "@type": "integer",
+            "@value": 5044
+          },
+          "tls_enable": {
+            "@type": "boolean",
+            "@value": false
+          },
+          "recv_buffer_size": {
+            "@type": "integer",
+            "@value": 1048576
+          },
+          "tcp_keepalive": {
+            "@type": "boolean",
+            "@value": false
+          },
+          "tls_client_auth_cert_file": {
+            "@type": "string",
+            "@value": ""
+          },
+          "bind_address": {
+            "@type": "string",
+            "@value": "0.0.0.0"
+          },
+          "no_beats_prefix": {
+            "@type": "boolean",
+            "@value": false
+          },
+          "tls_cert_file": {
+            "@type": "string",
+            "@value": ""
+          },
+          "tls_client_auth": {
+            "@type": "string",
+            "@value": "disabled"
+          },
+          "number_worker_threads": {
+            "@type": "integer",
+            "@value": 4
+          },
+          "tls_key_password": {
+            "@type": "string",
+            "@value": ""
+          }
+        },
+        "static_fields": {},
+        "type": {
+          "@type": "string",
+          "@value": "org.graylog.plugins.beats.Beats2Input"
+        },
+        "global": {
+          "@type": "boolean",
+          "@value": true
+        },
+        "extractors": []
+      },
+      "constraints": [
+        {
+          "type": "server-version",
+          "version": ">=3.0.1+de74b68"
+        }
+      ]
+    },
+    {
+      "v": "1",
+      "type": {
+        "name": "lookup_adapter",
+        "version": "1"
+      },
+      "id": "ce0a742e-8eaa-45c4-b9a8-e8d3b3f75237",
+      "data": {
+        "name": {
+          "@type": "string",
+          "@value": "admingroupscsv"
+        },
+        "title": {
+          "@type": "string",
+          "@value": "AdminGroupsCSV"
+        },
+        "description": {
+          "@type": "string",
+          "@value": "AD Groups with special privleges"
+        },
+        "configuration": {
+          "type": {
+            "@type": "string",
+            "@value": "csvfile"
+          },
+          "path": {
+            "@type": "string",
+            "@value": "/etc/graylog/admin_groups.csv"
+          },
+          "separator": {
+            "@type": "string",
+            "@value": ","
+          },
+          "quotechar": {
+            "@type": "string",
+            "@value": "\""
+          },
+          "key_column": {
+            "@type": "string",
+            "@value": "ADname"
+          },
+          "value_column": {
+            "@type": "string",
+            "@value": "nicename"
+          },
+          "check_interval": {
+            "@type": "long",
+            "@value": 60
+          },
+          "case_insensitive_lookup": {
+            "@type": "boolean",
+            "@value": true
+          }
+        }
+      },
+      "constraints": [
+        {
+          "type": "server-version",
+          "version": ">=3.0.1+de74b68"
+        }
+      ]
+    }
+  ]
+}
