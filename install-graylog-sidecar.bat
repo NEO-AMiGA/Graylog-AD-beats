@@ -22,25 +22,24 @@ IF %ERRORLEVEL% EQU 0 (
 :: Name of your server, only cosmetic in the installer and never used
 set "graylogServerHostName=m5-logger01"
 
-:: Installation directory on disk. Normally C:\Program Files\graylog
-set "graylogInstallationDir=C:\Program Files\graylog"
-
-:: Path to the graylog_sidecar_installer_x.x.x-x.exe installer
-set "graylogSidecarInstaller=C:\Users\%USERNAME%\Downloads\graylog_sidecar_installer_1.1.0-1.exe"
-
 :: URL to your server
 set "graylogServerURL=http://192.168.44.92:9000/api/"
 
 :: API TOKEN. Generate in web ui for the graylog-sidecar user
 set "graylogAPItoken=1u3ivm9ubg7fpi4tfqo0uass3e0n4nms5lvj96fuphj0qilubvgf"
 
+:: Installation directory on disk. Normally C:\Program Files\graylog
+set "graylogInstallationDir=C:\Program Files\graylog"
+
 :: The Graylog-AD-beats-master dir. Default is the one this bat file is runing from. 
 set "installerDir=%~dp0"
 
+:: Path to the graylog_sidecar_installer_x.x.x-x.exe installer
+set "graylogSidecarInstaller=%installerDir%\windows_installers_and_files\graylog_sidecar_installer_1.1.0-1.exe"
+
 :: An updated version of winlogbeat. Elasticsearch Beats changed the prefix from winlogbeat to winlog and the 'AD-Monitoring-pipeline-rules.json' uses this updated schema. 
 :: So use this exe or edit the json. 
-set "winlogBeatUpdatedEXE=%installerDir%\winlogbeat-7.16.3-windows-x86\winlogbeat.exe"
-
+set "winlogBeatUpdatedEXE=%installerDir%\windows_installers_and_files\winlogbeat-7.16.3-windows-x64\winlogbeat.exe"
 
 :: timestamp for backup of settings
 for /F "usebackq tokens=1,2 delims==" %%i in (`wmic os get LocalDateTime /VALUE 2^>NUL`) do if '.%%i.'=='.LocalDateTime.' set ldt=%%j
@@ -137,15 +136,17 @@ goto :update_winlogbeat_choice
 :update_winlogbeat_choice
 	echo.
 	echo IMPORTANT! The 'AD-Monitoring-pipeline-rules.json' expects an updated naming scheme that a newer version of the 'winlogbeat.exe' provides. 
-	echo You can either update the exe here, or edit the .json and rename the fields manually. I do not have a full list of whats needs to be renamed.
+	echo You can either let this installer update the exe, or you can edit the .json and rename the fields manually. I do not have a full list of what needs to be renamed.
 	echo The lazy and sober approach to this is to answer 'Y' here and replace the exe.
 	echo.
 	echo Current and installed version:
-	"%graylogInstallationDir%\sidecar\winlogbeat.exe version"
+	"%graylogInstallationDir%\sidecar\winlogbeat.exe" version
 	echo.
 	echo The version it would be replaced with:
 	%winlogBeatUpdatedEXE% version
 
+	echo.
+	echo.
 	set /P c=Do you want to replace the winlogbeat.exe [y/N]? 
 	setlocal EnableDelayedExpansion
 	if /I "!c!" == "Y" goto :replace_winlogbeat
@@ -157,7 +158,7 @@ goto :update_winlogbeat_choice
 	:: we need to stop it before replacing. I think. At least not so rude...
 	"%graylogInstallationDir%\sidecar\graylog-sidecar.exe" -service stop
 	echo [INFO] Copying new exe...
-	xcopy /y %winlogBeatUpdatedEXE% %graylogInstallationDir%\sidecar\
+	copy /y "%winlogBeatUpdatedEXE%" "%graylogInstallationDir%\sidecar\"
 	echo [INFO] Graylog Sidecar SERVICE starting...
 	"%graylogInstallationDir%\sidecar\graylog-sidecar.exe" -service start
 	echo. 
